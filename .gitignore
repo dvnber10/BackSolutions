@@ -1,0 +1,12 @@
+# Carpetas de compilación
+bin/
+obj/
+
+# Configuraciones locales con contraseñas (Secrets)
+appsettings.json
+appsettings.Development.json
+
+# Archivos de usuario e IDEs
+.vscode/
+.idea/
+*.user
