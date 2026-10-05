@@ -1,0 +1,9 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+
+  // Todos los tests de integración comparten una sola conexión SQL y una transacción
+  // ambiental por test. Si dos corrieran a la vez, cada uno abriría su transacción sobre
+  // la misma conexión y se romperían (o peor, uno revertiría lo del otro).
+  "parallelizeTestCollections": false,
+  "maxParallelThreads": 1
+}
