@@ -1,0 +1,6 @@
+@BackSolutions.Api_HostAddress = http://localhost:5047
+
+GET {{BackSolutions.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

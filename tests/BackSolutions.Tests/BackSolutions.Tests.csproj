@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+
+    <!-- Necesario para que AddUserSecrets funcione: guarda la cadena de la base de
+         tests fuera del repo. -->
+    <UserSecretsId>BackSolutions.Tests-c0f2b8a1-5d3e-4a97-b6c8-1f0e9d7a4b62</UserSecretsId>
+
+    <!-- Los tests corren contra SQL Server real y se revierten al final. Corren en
+         paralelo contra la misma base se pisarian entre si, asi que se desactivan
+         explicitamente en AssemblyInfo.cs en vez de confiar en el default de xUnit. -->
+    <NoWarn>$(NoWarn);EF1001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BackSolutions.Core\BackSolutions.Core.csproj" />
+    <ProjectReference Include="..\..\src\BackSolutions.Data\BackSolutions.Data.csproj" />
+    <ProjectReference Include="..\..\src\BackSolutions.Api\BackSolutions.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

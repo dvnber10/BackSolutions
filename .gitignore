@@ -1,12 +1,41 @@
-# Carpetas de compilación
+# ── Build ──
 bin/
 obj/
+dist/
+node_modules/
+*.dll
+*.pdb
 
-# Configuraciones locales con contraseñas (Secrets)
-appsettings.json
-appsettings.Development.json
-
-# Archivos de usuario e IDEs
+# ── IDE ──
+.vs/
 .vscode/
 .idea/
 *.user
+*.suo
+*.swp
+
+# ── Sistema operativo ──
+.DS_Store
+Thumbs.db
+
+# ── Secretos: NUNCA subirlos ──
+#   Desarrollo  → dotnet user-secrets  (~/.microsoft/usersecrets/)
+#   Producción  → App Settings de Azure App Service
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.p12
+*.key
+.env.local
+
+# ── Sistema ──
+BackSolutionsChat.db
+*.db-shm
+*.db-wal
+
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.p12
+*.key
