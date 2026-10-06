@@ -4,6 +4,7 @@ using BackSolutions.Core.Entities.Identity;
 using BackSolutions.Core.Interfaces;
 using BackSolutions.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BackSolutions.Api.Services;
 
@@ -27,6 +28,7 @@ public sealed class UserService : IUserService
     private readonly ITokenService _tokens;
     private readonly IClock _clock;
     private readonly IEmailSender _emailSender;
+    private readonly ILogger<UserService> _logger;
 
     public UserService(
         AppDbContext db,
@@ -34,7 +36,8 @@ public sealed class UserService : IUserService
         IPasswordHasher passwordHasher,
         ITokenService tokens,
         IClock clock,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        ILogger<UserService> logger)
     {
         _db = db;
         _currentUser = currentUser;
@@ -42,6 +45,7 @@ public sealed class UserService : IUserService
         _tokens = tokens;
         _clock = clock;
         _emailSender = emailSender;
+        _logger = logger;
     }
 
     public async Task<PagedResult<UserListItemDto>> ListAsync(
@@ -212,8 +216,9 @@ public sealed class UserService : IUserService
                 <p>Atentamente,<br/><strong>Equipo BackSolutions</strong></p>",
                 cancellationToken: cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "No se pudo enviar el email de bienvenida al usuario {Email}", user.Email);
         }
 
         return await GetByIdAsync(user.Id, cancellationToken);
@@ -357,8 +362,9 @@ public sealed class UserService : IUserService
                 <p>Atentamente,<br/><strong>Equipo BackSolutions</strong></p>",
                 cancellationToken: cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "No se pudo enviar el email de restablecimiento al usuario {Email}", user.Email);
         }
     }
 
@@ -428,7 +434,7 @@ public sealed class UserService : IUserService
         {
             throw new ValidationException(new Dictionary<string, string[]>
             {
-                ["roles"] = [$"Rol desconocido: {string.Join(", ", unknown)}. Válidos: {string.Join(", ", RoleNames.All)}."]
+                ["roles"] = [$"Roles desconocidos: {string.Join(", ", unknown)}"]
             });
         }
 
