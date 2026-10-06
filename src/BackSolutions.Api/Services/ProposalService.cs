@@ -31,14 +31,16 @@ public sealed class ProposalService : IProposalService
     private readonly ICurrentUser _currentUser;
     private readonly IClock _clock;
     private readonly IProposalPdfGenerator _pdf;
+    private readonly IEmailSender _emailSender;
 
-    public ProposalService(AppDbContext db, ICurrentUser currentUser, IClock clock, IProposalPdfGenerator pdf, ITransactionRunner transactions)
+    public ProposalService(AppDbContext db, ICurrentUser currentUser, IClock clock, IProposalPdfGenerator pdf, ITransactionRunner transactions, IEmailSender emailSender)
     {
         _transactions = transactions;
         _db = db;
         _currentUser = currentUser;
         _clock = clock;
         _pdf = pdf;
+        _emailSender = emailSender;
     }
 
     public async Task<PagedResult<ProposalListItemDto>> ListAsync(
@@ -214,6 +216,31 @@ public sealed class ProposalService : IProposalService
         {
             proposal.SentAtUtc = _clock.UtcNow;
             proposal.ValidUntil ??= DefaultValidUntil(await ValidityDaysAsync(cancellationToken));
+
+            if (!string.IsNullOrWhiteSpace(proposal.Lead?.Email))
+            {
+                try
+                {
+                    var pdf = await GeneratePdfAsync(id, cancellationToken);
+                    var subject = $"Propuesta comercial {proposal.Number}: {proposal.Title}";
+                    var htmlBody = $@"
+                        <p>Hola <strong>{proposal.Lead.Name}</strong>,</p>
+                        <p>Te enviamos adjunta la propuesta comercial <strong>{proposal.Number}</strong> correspondiente a <em>{proposal.Title}</em>.</p>
+                        <p>Quedamos a tu disposición por cualquier consulta.</p>
+                        <p>Atentamente,<br/><strong>Equipo BackSolutions</strong></p>";
+
+                    await _emailSender.SendEmailAsync(
+                        proposal.Lead.Email,
+                        subject,
+                        htmlBody,
+                        pdf.Content,
+                        pdf.FileName,
+                        cancellationToken);
+                }
+                catch
+                {
+                }
+            }
         }
 
         if (target == ProposalStatus.Accepted)

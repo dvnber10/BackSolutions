@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IEmailSender, EmailSender>();
 
         // ── Contenido público ──
         services.AddScoped<ISiteSettingsService, SiteSettingsService>();
