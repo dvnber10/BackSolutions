@@ -178,8 +178,7 @@ public sealed class ProposalService : IProposalService
         proposal.NotesHtml = request.NotesHtml?.Trim();
         proposal.Currency = await ResolveCurrency(request.Currency, cancellationToken);
 
-        proposal.Items.Clear();
-        AddItems(proposal, lines);
+        SyncItems(proposal, lines);
 
         await RecalculateAsync(proposal, request, cancellationToken);
 
@@ -365,6 +364,56 @@ public sealed class ProposalService : IProposalService
 
             proposal.Items.Add(item);
             _db.AddNew(item);
+        }
+    }
+
+    /// <summary>
+    /// Sincroniza las líneas de una propuesta existente reutilizando las entidades ya trackeadas.
+    ///
+    /// No se puede con <c>Items.Clear()</c> seguido de <c>AddNew</c>: <c>Clear()</c> solo saca las
+    /// líneas de la colección y las deja trackeadas como borradas, así que al volver a agregarlas con
+    /// el mismo Id (que es justo lo que manda el cliente al editar) EFCore lanza
+    /// <c>InvalidOperationException</c> por doble seguimiento de la misma clave y la actualización
+    /// terminaba en un 500 sin detalle.
+    /// </summary>
+    private void SyncItems(Proposal proposal, IReadOnlyList<SaveProposalItemRequest> lines)
+    {
+        var byId = proposal.Items.ToDictionary(i => i.Id);
+        var sortOrder = 0;
+
+        foreach (var line in lines.OrderBy(l => l.SortOrder))
+        {
+            ProposalItem? item = null;
+
+            if (line.Id is Guid id && byId.Remove(id, out var existing))
+            {
+                item = existing;
+            }
+
+            if (item is null)
+            {
+                item = new ProposalItem
+                {
+                    Id = line.Id ?? Guid.NewGuid(),
+                    ProposalId = proposal.Id
+                };
+
+                proposal.Items.Add(item);
+                _db.AddNew(item);
+            }
+
+            item.Description = line.Description.Trim();
+            item.Quantity = line.Quantity;
+            item.UnitPrice = line.UnitPrice;
+            item.DiscountPercent = line.DiscountPercent;
+            item.SortOrder = sortOrder;
+            sortOrder++;
+        }
+
+        // Las líneas que el cliente quitó: sacarlas de la colección basta para que EF las borre.
+        foreach (var removed in byId.Values)
+        {
+            proposal.Items.Remove(removed);
         }
     }
 
