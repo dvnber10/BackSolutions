@@ -26,19 +26,22 @@ public sealed class UserService : IUserService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokens;
     private readonly IClock _clock;
+    private readonly IEmailSender _emailSender;
 
     public UserService(
         AppDbContext db,
         ICurrentUser currentUser,
         IPasswordHasher passwordHasher,
         ITokenService tokens,
-        IClock clock)
+        IClock clock,
+        IEmailSender emailSender)
     {
         _db = db;
         _currentUser = currentUser;
         _passwordHasher = passwordHasher;
         _tokens = tokens;
         _clock = clock;
+        _emailSender = emailSender;
     }
 
     public async Task<PagedResult<UserListItemDto>> ListAsync(
@@ -196,6 +199,23 @@ public sealed class UserService : IUserService
 
         await _db.SaveChangesAsync(cancellationToken);
 
+        try
+        {
+            await _emailSender.SendEmailAsync(
+                user.Email,
+                "Bienvenido a BackSolutions - Tus credenciales de acceso",
+                $@"
+                <p>Hola <strong>{user.FullName}</strong>,</p>
+                <p>Se ha creado tu cuenta en el panel de BackSolutions.</p>
+                <p>Tu contraseña temporal es: <strong>{request.Password}</strong></p>
+                <p>Te recomendamos cambiarla al iniciar sesión por primera vez.</p>
+                <p>Atentamente,<br/><strong>Equipo BackSolutions</strong></p>",
+                cancellationToken: cancellationToken);
+        }
+        catch
+        {
+        }
+
         return await GetByIdAsync(user.Id, cancellationToken);
     }
 
@@ -275,11 +295,6 @@ public sealed class UserService : IUserService
             await GuardLastOwnerAsync(id, cancellationToken);
         }
 
-        // Se reasigna por diferencia y no con Clear() + reinserción. Clear() deja los
-        // links existentes en estado Deleted pero seguir trackeados, así que al volver a
-        // insertar un rol que el usuario ya tenía EF topa con dos instancias de la misma
-        // clave (UserId, RoleId) y tira un 500 en vez de tratar la asignación como el
-        // no-op que es.
         var wantedRoleIds = roles.Select(role => role.Id).ToHashSet();
         var assignedRoleIds = user.UserRoles.Select(link => link.RoleId).ToHashSet();
 
@@ -298,8 +313,6 @@ public sealed class UserService : IUserService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Los roles viajan en el JWT: sin revocar sesiones, el cambio no surte
-        // efecto hasta que el access token expire.
         await _tokens.RevokeAllForUserAsync(id, cancellationToken);
 
         return await GetByIdAsync(id, cancellationToken);
@@ -331,6 +344,22 @@ public sealed class UserService : IUserService
         await _db.SaveChangesAsync(cancellationToken);
 
         await _tokens.RevokeAllForUserAsync(id, cancellationToken);
+
+        try
+        {
+            await _emailSender.SendEmailAsync(
+                user.Email,
+                "Restablecimiento de contraseña - BackSolutions",
+                $@"
+                <p>Hola <strong>{user.FullName}</strong>,</p>
+                <p>Se ha restablecido tu contraseña en el panel de BackSolutions.</p>
+                <p>Tu nueva contraseña temporal es: <strong>{request.NewPassword}</strong></p>
+                <p>Atentamente,<br/><strong>Equipo BackSolutions</strong></p>",
+                cancellationToken: cancellationToken);
+        }
+        catch
+        {
+        }
     }
 
     public async Task DeactivateAsync(Guid id, CancellationToken cancellationToken = default)
@@ -351,10 +380,6 @@ public sealed class UserService : IUserService
         await _tokens.RevokeAllForUserAsync(id, cancellationToken);
     }
 
-    /// <summary>
-    /// Impide quedarse sin Owner. Si el usuario es el último con ese rol, la operación
-    /// que lo degrada o desactiva se rechaza.
-    /// </summary>
     private async Task GuardLastOwnerAsync(Guid userId, CancellationToken cancellationToken)
     {
         var isOwner = await _db.UserRoles
