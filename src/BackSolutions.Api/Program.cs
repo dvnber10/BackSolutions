@@ -9,6 +9,7 @@ using BackSolutions.Api.Services;
 using BackSolutions.Core.Options;
 using BackSolutions.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -150,6 +151,46 @@ builder.Services
             ValidAudience = jwtSection[nameof(JwtOptions.Audience)],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        // Sin esto, ASP.NET responde 401 con el cuerpo vacío y el cliente móvil no puede
+        // distinguir "sesión expirada" de un fallo cualquiera: lo reportaba como error
+        // inesperado. Ahora siempre sale ProblemDetails, igual que el resto de los errores.
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/problem+json";
+
+                var problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "No autenticado",
+                    Detail = "Tu sesión expiró o el token no es válido. Volvé a iniciar sesión.",
+                    Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                    Instance = context.HttpContext.Request.Path
+                };
+                problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+                problem.Extensions["errorCode"] = "session_expired";
+
+                await context.Response.WriteAsJsonAsync(
+                    problem,
+                    options: null,
+                    contentType: "application/problem+json");
+            },
+            OnAuthenticationFailed = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            }
         };
     });
 
